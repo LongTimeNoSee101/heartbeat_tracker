@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Heart Beat Tracker</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #111;
+      color: white;
+      display: flex;
+    }
+    .sidebar {
+      width: 250px;
+      background-color: #1a1a1a;
+      height: 100vh;
+      padding-top: 20px;
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+      position: fixed;
+    }
+    .sidebar button {
+      width: 90%;
+      padding: 15px;
+      margin: 10px;
+      font-size: 16px;
+      background: none;
+      color: white;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+      border-radius: 8px;
+    }
+    .sidebar button:hover, .sidebar button.active {
+      background-color: #333;
+    }
+    .main {
+      flex: 1;
+      padding: 40px;
+      margin-left: 250px;
+      position: relative;
+    }
+    .hidden {
+      display: none;
+    }
+    .table-container {
+      max-height: 70vh;
+      overflow-y: auto;
+      margin-top: 20px;
+      border: 1px solid #444;
+      border-radius: 5px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #444;
+      position: sticky;
+      top: 0;
+      background-color: #1a1a1a;
+    }
+    th {
+      color: red;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    h1 {
+      text-align: center;
+      color: red;
+    }
+    h2 {
+      text-align: center;
+      color: red;
+    }
+    .circle {
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      border: 10px solid red;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 20px;
+      margin-bottom: 40px;
+    }
+    .heart-icon {
+      font-size: 160px;
+      color: red;
+    }
+    #searchGroup {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    #searchInput {
+      flex: 1;
+      padding: 8px;
+      font-size: 14px;
+      background-color: #2b2b2b;
+      color: white;
+      border: 1px solid #555;
+      border-radius: 5px;
+    }
+    tr:hover {
+      background-color: #333;
+    }
+    /* Thanh cuộn tùy chỉnh */
+    .table-container::-webkit-scrollbar {
+      width: 8px;
+    }
+    .table-container::-webkit-scrollbar-track {
+      background: #1a1a1a;
+    }
+    .table-container::-webkit-scrollbar-thumb {
+      background-color: red;
+      border-radius: 10px;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+  <div class="sidebar">
+    <button onclick="showSection('home')" id="homeBtn" class="active">🏠 Trang chủ</button>
+    <button onclick="showSection('results')" id="resultsBtn">📊 Xem kết quả</button>
+  </div>
+  <div class="main">
+    <div id="homeSection">
+      <h1>HEART BEAT TRACKER</h1>
+      <div class="circle" id="heartbeatCircle">
+        <i class="fas fa-heart heart-icon"></i>
+      </div>
+    </div>
+
+    <div id="resultsSection" class="hidden">
+      <h2>Kết quả đo</h2>
+      <div class="table-container">
+        <table id="resultsTable">
+          <thead>
+            <tr><th>Thứ tự</th><th>Ngày đo</th><th>Giờ đo</th><th>Nhịp tim (BPM)</th></tr>
+          </thead>
+          <tbody id="dataTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAkRFYbrobOh-SvXaaJKlSyrwy-mFds8Io",
+      authDomain: "heartbeattracking-b2639.firebaseapp.com",
+      databaseURL: "https://heartbeattracking-b2639-default-rtdb.firebaseio.com",
+      projectId: "heartbeattracking-b2639",
+      storageBucket: "heartbeattracking-b2639.firebasestorage.app",
+      messagingSenderId: "985941591240",
+      appId: "1:985941591240:web:eedfe8e96abb2b103c91fd",
+      measurementId: "G-W1CYGBQ23V"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function showSection(section) {
+      ['home', 'results'].forEach(s => {
+        document.getElementById(s + 'Section').classList.add('hidden');
+        document.getElementById(s + 'Btn')?.classList.remove('active');
+      });
+      document.getElementById(section + 'Section').classList.remove('hidden');
+      document.getElementById(section + 'Btn')?.classList.add('active');
+      if (section === 'results') loadHeartbeatResults();
+    }
+
+    function loadHeartbeatResults() {
+    const tableBody = document.getElementById("dataTableBody");
+    tableBody.innerHTML = "<tr><td colspan='4' style='text-align: center;'>Đang tải dữ liệu...</td></tr>";
+    
+    db.ref("/heartBeatData").on("value", (snapshot) => {
+      const data = snapshot.val();
+      tableBody.innerHTML = "";
+      
+      if (!data || data.length === 0) {
+        tableBody.innerHTML = "<tr><td colspan='4' style='text-align: center;'>Không có dữ liệu nhịp tim</td></tr>";
+        return;
+      }
+      
+      // Lọc bỏ các giá trị null và giữ nguyên thứ tự từ Firebase
+      const filteredData = data.filter(item => item !== null && item.date && item.time);
+      
+      if (filteredData.length === 0) {
+        tableBody.innerHTML = "<tr><td colspan='4' style='text-align: center;'>Không có dữ liệu hợp lệ</td></tr>";
+        return;
+      }
+      
+      // Hiển thị dữ liệu theo đúng thứ tự từ Firebase (không sắp xếp)
+      filteredData.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${item.date || 'N/A'}</td>
+          <td>${item.time || 'N/A'}</td>
+          <td>${item.bpm !== undefined ? item.bpm : 'N/A'}</td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }, (error) => {
+      tableBody.innerHTML = `<tr><td colspan='4' style='text-align: center; color: red;'>Lỗi khi tải dữ liệu: ${error.message}</td></tr>`;
+    });
+  }
+      // Tải dữ liệu ban đầu khi trang được load
+      document.addEventListener('DOMContentLoaded', () => {
+        // Có thể thêm các xử lý khởi tạo khác ở đây
+      });
+    </script>
+  </body>
+  </html>
